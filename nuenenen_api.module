@@ -1,138 +1,33 @@
 <?php
 
-use Drupal\Component\Plugin\Exception\PluginNotFoundException;
-use Drupal\restful\Http\RequestInterface;
-use Drupal\restful\Authentication\AuthenticationManager;
-use Drupal\restful\Plugin\resource\ResourceInterface;
-
 /**
  * Implements hook_menu().
  */
-function nuenenen_api_menu() {
-	// Add administration page.
-	$items['admin/config/services/restful/token-auth'] = array(
-		'title' => 'Token Authentication',
-		'description' => 'Administer the RESTful Token Authentication module.',
-		'type' => MENU_LOCAL_TASK,
-		'page callback' => 'drupal_get_form',
-		'page arguments' => array('nuenenen_api_admin_settings'),
-		'access arguments' => array('administer restful'),
-		'file' => 'nuenenen_api_auth.admin.inc',
-	);
-	
-	return $items;
+function nuenenen_api_menu() { 
+  $items['node/%node/json'] = array(
+    'page callback' => 'nuenenen_api_endpoint',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+  );
+    
+  $items[drupal_get_path_alias().'/json'] = array(
+    'page callback' => 'nuenenen_api_endpoint',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+  );
+
+  return $items;
 }
 
 /**
- * Implements hook_restful_parse_request_alter().
- */
-function nuenenen_api_restful_parse_request_alter(RequestInterface &$request) {
-	// In this hook we cannot rely on the service to be ready.
-	$authentication_manager = new AuthenticationManager();
-	try {
-		// If the the authentication provider have not been added yet, add it.
-		$authentication_manager->addAuthenticationProvider('token');
-		$plugin = $authentication_manager->getPlugin('token');
-	}catch (PluginNotFoundException $e) {
-		watchdog_exception('nuenenen_api', $e);
-		return;
-	}
-	
-	$plugin_definition = $plugin->getPluginDefinition();
-	$param_name = $plugin_definition['options']['paramName'];
-
-	$header = $request->getHeaders()->get($param_name);
-	$request->setApplicationData($param_name, $header->getValueString());
-}
-
-/**
- * Implements hook_entity_info().
- */
-function nuenenen_api_entity_info() {
-	$items['nuenenen_api'] = array(
-			'label' => t('Authentication token'),
-			'entity class' => '\\Drupal\\nuenenen_api\\Entity\\RestfulTokenAuth',
-			'controller class' => '\\Drupal\\nuenenen_api\\Entity\\RestfulTokenAuthController',
-			'base table' => 'nuenenen_api',
-			'fieldable' => TRUE,
-			'entity keys' => array(
-				'id' => 'id',
-				'label' => 'name',
-				'bundle' => 'type',
-			),
-			'bundles' => array(
-				'access_token' => array(
-					'label' => t('Access token'),
-				),
-				'refresh_token' => array(
-					'label' => t('Refresh token'),
-				),
-			),
-			'bundle keys' => array(
-				'bundle' => 'type',
-			),
-			'module' => 'nuenenen_api',
-			'entity cache' => module_exists('entitycache'),
-	);
-
-	return $items;
-}
-
-/**
- * Implements hook_cron().
+ * Menu callback for the node JSON endpoint.
  *
- * Delete expired token auth entities.
+ * @param $node
+ *   A node object.
+ * 
+ * @return
+ *   Returns node as JSON.
  */
-function nuenenen_api_cron() {
-	if (!variable_get('nuenenen_api_delete_expired_tokens', TRUE)) {
-		// We should not delete expired tokens.
-		return;
-	}
-
-	$query = new \EntityFieldQuery();
-	$result = $query->entityCondition('entity_type', 'nuenenen_api')->propertyCondition('expire', REQUEST_TIME, '<')->range(0, 50)->execute();
-
-	if (empty($result['nuenenen_api'])) {
-		// No expired tokens.
-		return;
-	}
-
-	$ids = array_keys($result['nuenenen_api']);
-	entity_delete_multiple('nuenenen_api', $ids);
-}
-
-/**
- * Implements hook_restful_resource_alter().
- */
-function nuenenen_api_restful_resource_alter(ResourceInterface &$resource) {
-	$plugin_definition = $resource->getPluginDefinition();
-	if (
-		empty($plugin_definition['dataProvider']['entityType']) ||
-		$plugin_definition['dataProvider']['entityType'] != 'nuenenen_api' ||
-		!empty($plugin_definition['formatter'])
-	) {
-		return;
-	}
-	// If this resource is based on access token entities and does not have an
-	// explicit formatter attached to it, then use the single_json formatter.
-	$plugin_definition['formatter'] = 'single_json';
-	$resource->setPluginDefinition($plugin_definition);
-}
-
-/**
- * Implements hook_user_update().
- */
-function nuenenen_api_user_update(&$edit, $account, $category) {
-	if ($edit['status']) {
-		return;
-	}
-
-	$query = new EntityFieldQuery();
-	$result = $query->entityCondition('entity_type', 'nuenenen_api')->propertyCondition('uid', $account->uid)->execute();
-
-	if (empty($result['nuenenen_api'])) {
-		return;
-	}
-
-	entity_delete_multiple('nuenenen_api', array_keys($result['nuenenen_api']));
+function nuenenen_api_endpoint($node) {
+  drupal_json_output($node);
 }
