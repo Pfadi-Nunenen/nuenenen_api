@@ -9,7 +9,7 @@ function nuenenen_api_menu() {
     'page arguments' => array(1),
     'access arguments' => array('access content'),
   );
-    
+
   $items[drupal_get_path_alias().'/json'] = array(
     'page callback' => 'nuenenen_api_endpoint',
     'page arguments' => array(1),
