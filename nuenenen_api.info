@@ -1,4 +1,3 @@
 name = API-Module Pfadi Nünenen
 description = Get your nodes as JSON-API
 core = 7.x
-version = 7.x-1.0
